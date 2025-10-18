@@ -43,7 +43,7 @@
             opacity: 0.9;
             font-size: 16px;
         }
-        
+         
         .content {
             padding: 30px;
         }
@@ -370,7 +370,7 @@
                 sceneContainer.appendChild(div);
             });
 
-            // Populate characters
+            // Populate characters with custom order
             const characterSet = new Set();
             scriptData.scenes.forEach(scene => {
                 scene.lines.forEach(line => {
@@ -378,9 +378,19 @@
                 });
             });
             
+            // Priority order for main characters
+            const priorityOrder = ['SELBY', 'PRICE', 'DENT', 'MAYOR', 'THIEF', 'JOURNALIST', 'CELEBRITY'];
+            
+            // Sort: priority characters first, then alphabetically
+            const allCharacters = Array.from(characterSet);
+            const orderedCharacters = [
+                ...priorityOrder.filter(char => allCharacters.includes(char)),
+                ...allCharacters.filter(char => !priorityOrder.includes(char)).sort()
+            ];
+            
             const characterContainer = document.getElementById('characterCheckboxes');
             characterContainer.innerHTML = '';
-            Array.from(characterSet).sort().forEach(character => {
+            orderedCharacters.forEach(character => {
                 const div = document.createElement('div');
                 div.className = 'checkbox-item';
                 div.innerHTML = `
@@ -408,11 +418,6 @@
         }
 
         async function startRehearsal() {
-            // Initialize speech synthesis (important for mobile)
-            if (speechSynthesis.paused) {
-                speechSynthesis.resume();
-            }
-            
             // Get selected scenes
             const selectedScenes = Array.from(document.querySelectorAll('#sceneCheckboxes input:checked'))
                 .map(cb => cb.value);
@@ -427,10 +432,6 @@
                 Array.from(document.querySelectorAll('#characterCheckboxes input:checked'))
                     .map(cb => cb.value)
             );
-
-            // Test speech to wake up the engine on mobile
-            const testUtterance = new SpeechSynthesisUtterance('');
-            speechSynthesis.speak(testUtterance);
 
             isPlaying = true;
             document.getElementById('playBtn').disabled = true;
@@ -498,38 +499,21 @@
                     return;
                 }
 
-                // Cancel any ongoing speech first
-                speechSynthesis.cancel();
-
                 currentUtterance = new SpeechSynthesisUtterance(text);
                 const speed = parseFloat(document.getElementById('speedSlider').value);
                 currentUtterance.rate = speed;
-                currentUtterance.volume = 1.0;
-                currentUtterance.pitch = 1.0;
-                
-                // Use default voice (best for mobile compatibility)
-                const voices = speechSynthesis.getVoices();
-                if (voices.length > 0) {
-                    currentUtterance.voice = voices[0];
-                }
                 
                 currentUtterance.onend = () => {
                     currentUtterance = null;
                     resolve();
                 };
                 
-                currentUtterance.onerror = (event) => {
-                    console.log('Speech error:', event);
+                currentUtterance.onerror = () => {
                     currentUtterance = null;
                     resolve();
                 };
 
-                try {
-                    speechSynthesis.speak(currentUtterance);
-                } catch (e) {
-                    console.log('Speech error:', e);
-                    resolve();
-                }
+                speechSynthesis.speak(currentUtterance);
             });
         }
 
