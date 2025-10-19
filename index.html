@@ -404,9 +404,9 @@
                     if (selectedCharacters.has(lineData.character)) {
                         await playAudio(lineData.audio);
                     } else {
-                        // Pause for user to speak
-                        const words = lineData.line.split(' ').length;
-                        const pauseTime = Math.max(words / 3.0, 1000);
+                        // Calculate pause based on how long the audio would take
+                        // First, try to load the audio to get its actual duration
+                        const pauseTime = await getAudioDuration(lineData.audio);
                         await sleep(pauseTime);
                     }
                 }
