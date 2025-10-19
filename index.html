@@ -48,34 +48,6 @@
             padding: 30px;
         }
         
-        .upload-section {
-            text-align: center;
-            padding: 40px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            margin-bottom: 30px;
-        }
-        
-        .upload-section input[type="file"] {
-            display: none;
-        }
-        
-        .upload-btn {
-            background: #667eea;
-            color: white;
-            padding: 15px 40px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .upload-btn:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-        }
-        
         .selection-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -253,15 +225,6 @@
             vertical-align: middle;
         }
         
-        .speed-control select {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #ddd;
-            font-size: 14px;
-            margin-left: 10px;
-            max-width: 300px;
-        }
-        
         .speed-control span {
             margin-left: 10px;
             font-weight: bold;
@@ -277,58 +240,45 @@
         </div>
         
         <div class="content">
-            <div id="uploadSection" class="upload-section">
-                <h2 style="margin-bottom: 20px;">Upload Your Script Data</h2>
-                <p style="margin-bottom: 20px; color: #666;">Upload the script_data.json file from your Python script</p>
-                <input type="file" id="fileInput" accept=".json">
-                <label for="fileInput" class="upload-btn">Choose File</label>
-                <p id="fileName" style="margin-top: 15px; color: #666;"></p>
+            <div class="speed-control">
+                <label for="speedSlider">Playback Speed:</label>
+                <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1.0">
+                <span id="speedValue">1.0x</span>
             </div>
             
-            <div id="mainSection" class="hidden">
-                <div class="speed-control">
-                    <label for="voiceSelect">Voice:</label>
-                    <select id="voiceSelect"></select>
-                    <br><br>
-                    <label for="speedSlider">Speech Speed:</label>
-                    <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1.0">
-                    <span id="speedValue">1.0x</span>
+            <div class="selection-container">
+                <div class="selection-box">
+                    <h3>
+                        Select Scenes
+                        <div class="button-group">
+                            <button class="small-btn" onclick="selectAllScenes()">All</button>
+                            <button class="small-btn" onclick="deselectAllScenes()">None</button>
+                        </div>
+                    </h3>
+                    <div class="checkbox-container" id="sceneCheckboxes"></div>
                 </div>
                 
-                <div class="selection-container">
-                    <div class="selection-box">
-                        <h3>
-                            Select Scenes
-                            <div class="button-group">
-                                <button class="small-btn" onclick="selectAllScenes()">All</button>
-                                <button class="small-btn" onclick="deselectAllScenes()">None</button>
-                            </div>
-                        </h3>
-                        <div class="checkbox-container" id="sceneCheckboxes"></div>
-                    </div>
-                    
-                    <div class="selection-box">
-                        <h3>
-                            Characters to Speak
-                            <div class="button-group">
-                                <button class="small-btn" onclick="selectAllCharacters()">All</button>
-                                <button class="small-btn" onclick="deselectAllCharacters()">None</button>
-                            </div>
-                        </h3>
-                        <div class="checkbox-container" id="characterCheckboxes"></div>
-                    </div>
+                <div class="selection-box">
+                    <h3>
+                        Characters to Speak
+                        <div class="button-group">
+                            <button class="small-btn" onclick="selectAllCharacters()">All</button>
+                            <button class="small-btn" onclick="deselectAllCharacters()">None</button>
+                        </div>
+                    </h3>
+                    <div class="checkbox-container" id="characterCheckboxes"></div>
                 </div>
-                
-                <div class="controls">
-                    <button class="control-btn play-btn" id="playBtn" onclick="startRehearsal()">▶ Start Rehearsal</button>
-                    <button class="control-btn stop-btn" id="stopBtn" onclick="stopRehearsal()" disabled>⏹ Stop</button>
-                </div>
-                
-                <div class="status ready" id="status">Ready to rehearse</div>
-                
-                <div class="line-display" id="lineDisplay">
-                    <div style="text-align: center; color: #999;">Select scenes and press Start to begin</div>
-                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn play-btn" id="playBtn" onclick="startRehearsal()">▶ Start Rehearsal</button>
+                <button class="control-btn stop-btn" id="stopBtn" onclick="stopRehearsal()" disabled>⏹ Stop</button>
+            </div>
+            
+            <div class="status ready" id="status">Ready to rehearse</div>
+            
+            <div class="line-display" id="lineDisplay">
+                <div style="text-align: center; color: #999;">Select scenes and press Start to begin</div>
             </div>
         </div>
     </div>
@@ -336,63 +286,19 @@
     <script>
         let scriptData = null;
         let isPlaying = false;
-        let speechSynthesis = window.speechSynthesis;
-        let currentUtterance = null;
-        let availableVoices = [];
+        let currentAudio = null;
 
-        // Load voices
-        function loadVoices() {
-            availableVoices = speechSynthesis.getVoices();
-            const voiceSelect = document.getElementById('voiceSelect');
-            
-            if (availableVoices.length > 0) {
-                voiceSelect.innerHTML = '';
-                
-                // Prefer English voices
-                const englishVoices = availableVoices.filter(voice => 
-                    voice.lang.startsWith('en-')
-                );
-                
-                const voicesToShow = englishVoices.length > 0 ? englishVoices : availableVoices;
-                
-                voicesToShow.forEach((voice, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = `${voice.name} (${voice.lang})`;
-                    
-                    // Try to select a natural US or GB voice by default
-                    if (voice.lang === 'en-US' && (voice.name.includes('Samantha') || voice.name.includes('Google') || voice.name.includes('Natural'))) {
-                        option.selected = true;
-                    }
-                    
-                    voiceSelect.appendChild(option);
-                });
-            }
-        }
-
-        // Load voices on page load and when they change
-        speechSynthesis.onvoiceschanged = loadVoices;
-        loadVoices();
-
-        // File upload handling
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                document.getElementById('fileName').textContent = `Loading ${file.name}...`;
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    try {
-                        scriptData = JSON.parse(event.target.result);
-                        loadScript();
-                        document.getElementById('fileName').textContent = `✓ Loaded ${file.name}`;
-                    } catch (error) {
-                        alert('Error parsing JSON file. Please make sure it\'s a valid script_data.json file.');
-                        document.getElementById('fileName').textContent = 'Error loading file';
-                    }
-                };
-                reader.readAsText(file);
-            }
-        });
+        // Load script data automatically
+        fetch('script_data.json')
+            .then(response => response.json())
+            .then(data => {
+                scriptData = data;
+                loadScript();
+            })
+            .catch(error => {
+                console.error('Error loading script:', error);
+                updateStatus('Error loading script data', 'error');
+            });
 
         // Speed control
         document.getElementById('speedSlider').addEventListener('input', function(e) {
@@ -400,9 +306,7 @@
         });
 
         function loadScript() {
-            // Hide upload, show main section
-            document.getElementById('uploadSection').classList.add('hidden');
-            document.getElementById('mainSection').classList.remove('hidden');
+            updateStatus('Script loaded! Ready to rehearse', 'ready');
 
             // Populate scenes
             const sceneContainer = document.getElementById('sceneCheckboxes');
@@ -455,11 +359,6 @@
         }
 
         async function startRehearsal() {
-            // Initialize speech synthesis (important for mobile)
-            if (speechSynthesis.paused) {
-                speechSynthesis.resume();
-            }
-            
             // Get selected scenes
             const selectedScenes = Array.from(document.querySelectorAll('#sceneCheckboxes input:checked'))
                 .map(cb => cb.value);
@@ -474,10 +373,6 @@
                 Array.from(document.querySelectorAll('#characterCheckboxes input:checked'))
                     .map(cb => cb.value)
             );
-
-            // Test speech to wake up the engine on mobile
-            const testUtterance = new SpeechSynthesisUtterance('');
-            speechSynthesis.speak(testUtterance);
 
             isPlaying = true;
             document.getElementById('playBtn').disabled = true;
@@ -507,7 +402,7 @@
                     updateStatus(`Scene ${scene.scene_number} | Line ${lineCounter}/${totalLines}`, 'playing');
 
                     if (selectedCharacters.has(lineData.character)) {
-                        await speakLine(lineData.line);
+                        await playAudio(lineData.audio);
                     } else {
                         // Pause for user to speak
                         const words = lineData.line.split(' ').length;
@@ -531,52 +426,42 @@
             document.getElementById('playBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
             
-            // Stop any ongoing speech
-            if (currentUtterance) {
-                speechSynthesis.cancel();
-                currentUtterance = null;
+            // Stop any ongoing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
             }
         }
 
-        function speakLine(text) {
+        function playAudio(audioPath) {
             return new Promise((resolve) => {
                 if (!isPlaying) {
                     resolve();
                     return;
                 }
 
-                // Cancel any ongoing speech first
-                speechSynthesis.cancel();
-
-                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentAudio = new Audio(audioPath);
                 const speed = parseFloat(document.getElementById('speedSlider').value);
-                currentUtterance.rate = speed;
-                currentUtterance.volume = 1.0;
-                currentUtterance.pitch = 1.0;
+                currentAudio.playbackRate = speed;
                 
-                // Use default voice (best for mobile compatibility)
-                const voices = speechSynthesis.getVoices();
-                if (voices.length > 0) {
-                    currentUtterance.voice = voices[0];
-                }
-                
-                currentUtterance.onend = () => {
-                    currentUtterance = null;
+                currentAudio.onended = () => {
+                    currentAudio = null;
                     resolve();
                 };
                 
-                currentUtterance.onerror = (event) => {
-                    console.log('Speech error:', event);
-                    currentUtterance = null;
-                    resolve();
+                currentAudio.onerror = (e) => {
+                    console.error('Audio error:', e);
+                    currentAudio = null;
+                    // Fall back to pause
+                    const words = 10; // rough estimate
+                    setTimeout(resolve, words / 3.0 * 1000);
                 };
 
-                try {
-                    speechSynthesis.speak(currentUtterance);
-                } catch (e) {
-                    console.log('Speech error:', e);
+                currentAudio.play().catch(err => {
+                    console.error('Play error:', err);
                     resolve();
-                }
+                });
             });
         }
 
