@@ -43,7 +43,7 @@
             opacity: 0.9;
             font-size: 16px;
         }
-         
+        
         .content {
             padding: 30px;
         }
@@ -253,6 +253,15 @@
             vertical-align: middle;
         }
         
+        .speed-control select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            margin-left: 10px;
+            max-width: 300px;
+        }
+        
         .speed-control span {
             margin-left: 10px;
             font-weight: bold;
@@ -278,6 +287,9 @@
             
             <div id="mainSection" class="hidden">
                 <div class="speed-control">
+                    <label for="voiceSelect">Voice:</label>
+                    <select id="voiceSelect"></select>
+                    <br><br>
                     <label for="speedSlider">Speech Speed:</label>
                     <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1.0">
                     <span id="speedValue">1.0x</span>
@@ -326,6 +338,41 @@
         let isPlaying = false;
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
+        let availableVoices = [];
+
+        // Load voices
+        function loadVoices() {
+            availableVoices = speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            
+            if (availableVoices.length > 0) {
+                voiceSelect.innerHTML = '';
+                
+                // Prefer English voices
+                const englishVoices = availableVoices.filter(voice => 
+                    voice.lang.startsWith('en-')
+                );
+                
+                const voicesToShow = englishVoices.length > 0 ? englishVoices : availableVoices;
+                
+                voicesToShow.forEach((voice, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    
+                    // Try to select a natural US or GB voice by default
+                    if (voice.lang === 'en-US' && (voice.name.includes('Samantha') || voice.name.includes('Google') || voice.name.includes('Natural'))) {
+                        option.selected = true;
+                    }
+                    
+                    voiceSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Load voices on page load and when they change
+        speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
 
         // File upload handling
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -370,7 +417,7 @@
                 sceneContainer.appendChild(div);
             });
 
-            // Populate characters with custom order
+            // Populate characters
             const characterSet = new Set();
             scriptData.scenes.forEach(scene => {
                 scene.lines.forEach(line => {
@@ -378,19 +425,9 @@
                 });
             });
             
-            // Priority order for main characters
-            const priorityOrder = ['SELBY', 'PRICE', 'DENT', 'MAYOR', 'THIEF', 'JOURNALIST', 'CELEBRITY'];
-            
-            // Sort: priority characters first, then alphabetically
-            const allCharacters = Array.from(characterSet);
-            const orderedCharacters = [
-                ...priorityOrder.filter(char => allCharacters.includes(char)),
-                ...allCharacters.filter(char => !priorityOrder.includes(char)).sort()
-            ];
-            
             const characterContainer = document.getElementById('characterCheckboxes');
             characterContainer.innerHTML = '';
-            orderedCharacters.forEach(character => {
+            Array.from(characterSet).sort().forEach(character => {
                 const div = document.createElement('div');
                 div.className = 'checkbox-item';
                 div.innerHTML = `
@@ -418,6 +455,11 @@
         }
 
         async function startRehearsal() {
+            // Initialize speech synthesis (important for mobile)
+            if (speechSynthesis.paused) {
+                speechSynthesis.resume();
+            }
+            
             // Get selected scenes
             const selectedScenes = Array.from(document.querySelectorAll('#sceneCheckboxes input:checked'))
                 .map(cb => cb.value);
@@ -432,6 +474,10 @@
                 Array.from(document.querySelectorAll('#characterCheckboxes input:checked'))
                     .map(cb => cb.value)
             );
+
+            // Test speech to wake up the engine on mobile
+            const testUtterance = new SpeechSynthesisUtterance('');
+            speechSynthesis.speak(testUtterance);
 
             isPlaying = true;
             document.getElementById('playBtn').disabled = true;
@@ -499,21 +545,38 @@
                     return;
                 }
 
+                // Cancel any ongoing speech first
+                speechSynthesis.cancel();
+
                 currentUtterance = new SpeechSynthesisUtterance(text);
                 const speed = parseFloat(document.getElementById('speedSlider').value);
                 currentUtterance.rate = speed;
+                currentUtterance.volume = 1.0;
+                currentUtterance.pitch = 1.0;
+                
+                // Use default voice (best for mobile compatibility)
+                const voices = speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    currentUtterance.voice = voices[0];
+                }
                 
                 currentUtterance.onend = () => {
                     currentUtterance = null;
                     resolve();
                 };
                 
-                currentUtterance.onerror = () => {
+                currentUtterance.onerror = (event) => {
+                    console.log('Speech error:', event);
                     currentUtterance = null;
                     resolve();
                 };
 
-                speechSynthesis.speak(currentUtterance);
+                try {
+                    speechSynthesis.speak(currentUtterance);
+                } catch (e) {
+                    console.log('Speech error:', e);
+                    resolve();
+                }
             });
         }
 
