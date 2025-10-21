@@ -164,6 +164,16 @@
             transform: translateY(-2px);
         }
         
+        .pause-btn {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .pause-btn:hover:not(:disabled) {
+            background: #f57c00;
+            transform: translateY(-2px);
+        }
+        
         .control-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -272,6 +282,7 @@
             
             <div class="controls">
                 <button class="control-btn play-btn" id="playBtn" onclick="startRehearsal()">▶ Start Rehearsal</button>
+                <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseRehearsal()" disabled>⏸ Pause</button>
                 <button class="control-btn stop-btn" id="stopBtn" onclick="stopRehearsal()" disabled>⏹ Stop</button>
             </div>
             
@@ -286,6 +297,7 @@
     <script>
         let scriptData = null;
         let isPlaying = false;
+        let isPaused = false;
         let currentAudio = null;
 
         // Load script data automatically
@@ -387,7 +399,9 @@
             );
 
             isPlaying = true;
+            isPaused = false;
             document.getElementById('playBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = false;
             document.getElementById('stopBtn').disabled = false;
 
             // Filter scenes
@@ -437,7 +451,9 @@
 
         function stopRehearsal() {
             isPlaying = false;
+            isPaused = false;
             document.getElementById('playBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
             document.getElementById('stopBtn').disabled = true;
             
             // Stop any ongoing audio
@@ -445,6 +461,24 @@
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
                 currentAudio = null;
+            }
+        }
+
+        function pauseRehearsal() {
+            if (isPaused) {
+                // Resume
+                isPaused = false;
+                document.getElementById('pauseBtn').textContent = '⏸ Pause';
+                if (currentAudio && currentAudio.paused) {
+                    currentAudio.play();
+                }
+            } else {
+                // Pause
+                isPaused = true;
+                document.getElementById('pauseBtn').textContent = '▶ Resume';
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
             }
         }
 
@@ -481,17 +515,19 @@
 
         function sleep(ms) {
             return new Promise(resolve => {
+                const startTime = Date.now();
                 const checkInterval = setInterval(() => {
                     if (!isPlaying) {
                         clearInterval(checkInterval);
                         resolve();
+                    } else if (!isPaused) {
+                        const elapsed = Date.now() - startTime;
+                        if (elapsed >= ms) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
                     }
                 }, 100);
-
-                setTimeout(() => {
-                    clearInterval(checkInterval);
-                    resolve();
-                }, ms);
             });
         }
 
