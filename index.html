@@ -401,13 +401,20 @@
                     updateLineDisplay(lineData.character, lineData.line);
                     updateStatus(`Scene ${scene.scene_number} | Line ${lineCounter}/${totalLines}`, 'playing');
 
+                    console.log(`Line ${lineCounter}: ${lineData.character} - Selected: ${selectedCharacters.has(lineData.character)}`);
+                    console.log(`Audio path: ${lineData.audio}`);
+
                     if (selectedCharacters.has(lineData.character)) {
+                        console.log('Playing audio...');
                         await playAudio(lineData.audio);
+                        console.log('Audio finished');
                     } else {
                         // Calculate pause based on how long the audio would take
-                        // First, try to load the audio to get its actual duration
+                        console.log('Getting audio duration for pause...');
                         const pauseTime = await getAudioDuration(lineData.audio);
+                        console.log(`Pausing for ${pauseTime}ms`);
                         await sleep(pauseTime);
+                        console.log('Pause finished');
                     }
                 }
             }
